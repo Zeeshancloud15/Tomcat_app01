@@ -96,7 +96,7 @@ pipeline {
 
         success {
             echo 'Pipeline completed successfully.'
-            echo 'Application: http://3.235.2.67:8080/declarativejob/'
+            echo 'Application: http:/35.169.107.79:8080/declarativejob/'
         }
 
         failure {
