@@ -83,7 +83,7 @@ pipeline {
                     tomcat9(
                         credentialsId: 'tomcat-jenkins',
                         path: '',
-                        url: 'http://3.235.2.67:8080'
+                        url: 'http://35.169.107.79:8080'
                     )
                 ],
                 contextPath: '/declarativejob',
