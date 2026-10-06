@@ -1,168 +1,87 @@
-```groovy
 node {
 
-    // Jenkins Maven installation
     def mavenTool = tool 'maven-integration'
     env.PATH = "${mavenTool}/bin:${env.PATH}"
 
-    // Application configuration
     def APPLICATION_NAME = 'customer-web'
     def DEPLOY_CONTEXT = '/customerapp'
 
-    // Nexus configuration
-    def ARTIFACTORY_HOST = 'http://3.95.22.37:8081'
     def NEXUS_AUTH = 'nexus-creid'
-
-    // Tomcat server
     def APPLICATION_SERVER = 'http://35.169.107.79:8080'
 
     try {
 
-        // =========================================
-        // 1. SOURCE CODE CHECKOUT
-        // =========================================
-
         stage('Source Checkout') {
-
             git(
                 branch: 'main',
                 url: 'https://github.com/Zeeshancloud15/Tomcat_app01.git'
             )
         }
 
-
-        // =========================================
-        // 2. MAVEN BUILD
-        // =========================================
-
-        stage('Compile & Package') {
-
+        stage('Compile and Package') {
             sh 'mvn clean package'
         }
 
-
-        // =========================================
-        // 3. CHECK GENERATED ARTIFACT
-        // =========================================
-
         stage('Artifact Validation') {
-
             sh '''
-                echo "Generated artifacts:"
                 ls -lh target/
-
                 test -f target/tomcat-app01.war
-
-                echo "WAR file validation successful."
             '''
         }
 
-
-        // =========================================
-        // 4. SONARQUBE CODE ANALYSIS
-        // =========================================
-
         stage('Code Quality Analysis') {
-
             withSonarQubeEnv('sonar-server') {
-
                 sh '''
                     /opt/sonar-scanner/bin/sonar-scanner
                 '''
             }
         }
 
-
-        // =========================================
-        // 5. SONARQUBE QUALITY GATE
-        // =========================================
-
         stage('Quality Validation') {
-
             timeout(time: 1, unit: 'MINUTES') {
-
                 waitForQualityGate abortPipeline: false
             }
         }
 
-
-        // =========================================
-        // 6. UPLOAD WAR TO NEXUS
-        // =========================================
-
         stage('Publish Artifact') {
-
             nexusArtifactUploader(
-
                 nexusVersion: 'nexus3',
-
                 protocol: 'http',
-
                 nexusUrl: '3.95.22.37:8081',
-
                 groupId: 'com.customer',
-
                 version: '2.0',
-
                 repository: 'maven-release',
-
                 credentialsId: NEXUS_AUTH,
-
                 artifacts: [
-
                     [
                         artifactId: APPLICATION_NAME,
-
                         classifier: '',
-
                         file: 'target/tomcat-app01.war',
-
                         type: 'war'
                     ]
                 ]
             )
         }
 
-
-        // =========================================
-        // 7. DEPLOY APPLICATION TO TOMCAT
-        // =========================================
-
         stage('Application Deployment') {
-
             deploy(
-
                 adapters: [
-
                     tomcat9(
-
                         credentialsId: 'tomcat-jenkins',
-
                         path: '',
-
-                        url: "${APPLICATION_SERVER}"
+                        url: APPLICATION_SERVER
                     )
                 ],
-
-                contextPath: "${DEPLOY_CONTEXT}",
-
+                contextPath: DEPLOY_CONTEXT,
                 war: 'target/tomcat-app01.war'
             )
         }
 
-
-        // =========================================
-        // 8. SUCCESS SLACK MESSAGE
-        // =========================================
-
         stage('Notify Success') {
-
             slackSend(
-
                 color: 'good',
-
                 message: """
-CI/CD PIPELINE COMPLETED SUCCESSFULLY
+CI/CD PIPELINE SUCCESS
 
 Application : ${APPLICATION_NAME}
 Job         : ${env.JOB_NAME}
@@ -178,18 +97,10 @@ ${env.BUILD_URL}
             )
         }
 
-    }
-
-    catch (Exception failure) {
-
-        // =========================================
-        // FAILURE NOTIFICATION
-        // =========================================
+    } catch (Exception failure) {
 
         slackSend(
-
             color: 'danger',
-
             message: """
 CI/CD PIPELINE FAILED
 
@@ -204,10 +115,9 @@ ${env.BUILD_URL}
         )
 
         throw failure
-    }
 
-    finally {
+    } finally {
 
-        echo 'Jenkins CI/CD execution has finished.'
+        echo 'Jenkins CI/CD execution completed.'
     }
 }
