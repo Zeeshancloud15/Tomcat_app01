@@ -1,124 +1,213 @@
+```groovy
 node {
 
-    // Maven configured in Jenkins
-    def mvnHome = tool 'maven-integration'
-    env.PATH = "${mvnHome}/bin:${env.PATH}"
+    // Jenkins Maven installation
+    def mavenTool = tool 'maven-integration'
+    env.PATH = "${mavenTool}/bin:${env.PATH}"
 
-    def APP_NAME = 'tomcat-app01'
-    def CONTEXT_PATH = '/declarativejob'
+    // Application configuration
+    def APPLICATION_NAME = 'customer-web'
+    def DEPLOY_CONTEXT = '/customerapp'
 
-    def NEXUS_URL = 'http://3.95.22.37:8081'
-    def NEXUS_CREDENTIALS = 'nexus-creid'
+    // Nexus configuration
+    def ARTIFACTORY_HOST = 'http://3.95.22.37:8081'
+    def NEXUS_AUTH = 'nexus-creid'
 
-    def TOMCAT_URL = 'http://35.169.107.79:8080'
+    // Tomcat server
+    def APPLICATION_SERVER = 'http://35.169.107.79:8080'
 
     try {
 
-        stage('Checkout') {
+        // =========================================
+        // 1. SOURCE CODE CHECKOUT
+        // =========================================
+
+        stage('Source Checkout') {
+
             git(
                 branch: 'main',
                 url: 'https://github.com/Zeeshancloud15/Tomcat_app01.git'
             )
         }
 
-        stage('Build') {
+
+        // =========================================
+        // 2. MAVEN BUILD
+        // =========================================
+
+        stage('Compile & Package') {
+
             sh 'mvn clean package'
         }
 
-        stage('Verify WAR') {
+
+        // =========================================
+        // 3. CHECK GENERATED ARTIFACT
+        // =========================================
+
+        stage('Artifact Validation') {
+
             sh '''
+                echo "Generated artifacts:"
                 ls -lh target/
+
                 test -f target/tomcat-app01.war
+
+                echo "WAR file validation successful."
             '''
         }
 
-        stage('SonarQube Analysis') {
+
+        // =========================================
+        // 4. SONARQUBE CODE ANALYSIS
+        // =========================================
+
+        stage('Code Quality Analysis') {
+
             withSonarQubeEnv('sonar-server') {
+
                 sh '''
                     /opt/sonar-scanner/bin/sonar-scanner
                 '''
             }
         }
 
-        stage('Quality Gate') {
+
+        // =========================================
+        // 5. SONARQUBE QUALITY GATE
+        // =========================================
+
+        stage('Quality Validation') {
+
             timeout(time: 1, unit: 'MINUTES') {
+
                 waitForQualityGate abortPipeline: false
             }
         }
 
-        stage('Upload to Nexus') {
+
+        // =========================================
+        // 6. UPLOAD WAR TO NEXUS
+        // =========================================
+
+        stage('Publish Artifact') {
+
             nexusArtifactUploader(
+
                 nexusVersion: 'nexus3',
+
                 protocol: 'http',
+
                 nexusUrl: '3.95.22.37:8081',
-                groupId: 'com.zeeshan',
-                version: '1.0',
+
+                groupId: 'com.customer',
+
+                version: '2.0',
+
                 repository: 'maven-release',
-                credentialsId: 'nexus-creid',
+
+                credentialsId: NEXUS_AUTH,
+
                 artifacts: [
+
                     [
-                        artifactId: 'tomcat-app01',
+                        artifactId: APPLICATION_NAME,
+
                         classifier: '',
+
                         file: 'target/tomcat-app01.war',
+
                         type: 'war'
                     ]
                 ]
             )
         }
 
-        stage('Deploy to Tomcat') {
+
+        // =========================================
+        // 7. DEPLOY APPLICATION TO TOMCAT
+        // =========================================
+
+        stage('Application Deployment') {
+
             deploy(
+
                 adapters: [
+
                     tomcat9(
+
                         credentialsId: 'tomcat-jenkins',
+
                         path: '',
-                        url: "${TOMCAT_URL}"
+
+                        url: "${APPLICATION_SERVER}"
                     )
                 ],
-                contextPath: "${CONTEXT_PATH}",
+
+                contextPath: "${DEPLOY_CONTEXT}",
+
                 war: 'target/tomcat-app01.war'
             )
         }
 
-        stage('Slack Notification') {
+
+        // =========================================
+        // 8. SUCCESS SLACK MESSAGE
+        // =========================================
+
+        stage('Notify Success') {
+
             slackSend(
+
                 color: 'good',
+
                 message: """
-SUCCESS: Jenkins Pipeline
+CI/CD PIPELINE COMPLETED SUCCESSFULLY
 
-Job: ${env.JOB_NAME}
-Build: #${env.BUILD_NUMBER}
-Status: SUCCESS
+Application : ${APPLICATION_NAME}
+Job         : ${env.JOB_NAME}
+Build       : #${env.BUILD_NUMBER}
+Status      : SUCCESS
 
-Application:
-${TOMCAT_URL}${CONTEXT_PATH}/
+Application URL:
+${APPLICATION_SERVER}${DEPLOY_CONTEXT}/
 
-Build URL:
+Jenkins Build:
 ${env.BUILD_URL}
 """
             )
         }
 
-    } catch (Exception e) {
+    }
+
+    catch (Exception failure) {
+
+        // =========================================
+        // FAILURE NOTIFICATION
+        // =========================================
 
         slackSend(
+
             color: 'danger',
+
             message: """
-FAILED: Jenkins Pipeline
+CI/CD PIPELINE FAILED
 
-Job: ${env.JOB_NAME}
-Build: #${env.BUILD_NUMBER}
-Status: FAILED
+Application : ${APPLICATION_NAME}
+Job         : ${env.JOB_NAME}
+Build       : #${env.BUILD_NUMBER}
+Status      : FAILED
 
-Build URL:
+Jenkins Build:
 ${env.BUILD_URL}
 """
         )
 
-        throw e
+        throw failure
+    }
 
-    } finally {
+    finally {
 
-        echo 'Pipeline execution completed.'
+        echo 'Jenkins CI/CD execution has finished.'
     }
 }
