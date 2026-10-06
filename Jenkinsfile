@@ -63,7 +63,7 @@ pipeline {
                     nexusUrl: '3.95.22.37:8081',
                     groupId: 'com.zeeshan',
                     version: '1.0',
-                    repository: 'NEXUS_REPOSITORY_NAME',
+                    repository: 'maven-release',
                     credentialsId: 'nexus-creid',
                     artifacts: [
                         [
@@ -81,7 +81,7 @@ pipeline {
             steps {
                 deploy adapters: [
                     tomcat9(
-                        credentialsId: 'TOMCAT_CREDENTIAL_ID',
+                        credentialsId: 'tomcat-jenkins',
                         path: '',
                         url: 'http://3.235.2.67:8080'
                     )
