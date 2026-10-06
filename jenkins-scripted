@@ -1,0 +1,123 @@
+node {
+
+    def APP_NAME = 'tomcat-app01'
+    def CONTEXT_PATH = '/declarativejob'
+
+    def NEXUS_URL = 'http://3.95.22.37:8081'
+    def NEXUS_CREDENTIALS = 'nexus-creid'
+
+    def TOMCAT_URL = 'http://35.169.107.79:8080'
+
+    try {
+
+        stage('Checkout') {
+            git branch: 'main',
+                url: 'https://github.com/Zeeshancloud15/Tomcat_app01.git'
+        }
+
+        stage('Build') {
+            sh 'mvn clean package'
+        }
+
+        stage('Verify WAR') {
+            sh '''
+                ls -lh target/
+                test -f target/tomcat-app01.war
+            '''
+        }
+
+        stage('SonarQube Analysis') {
+
+            withSonarQubeEnv('sonar-server') {
+
+                sh '''
+                    /opt/sonar-scanner/bin/sonar-scanner
+                '''
+            }
+        }
+
+        stage('Quality Gate') {
+
+            timeout(time: 1, unit: 'MINUTES') {
+
+                waitForQualityGate abortPipeline: false
+            }
+        }
+
+        stage('Upload to Nexus') {
+
+            nexusArtifactUploader(
+                nexusVersion: 'nexus3',
+                protocol: 'http',
+                nexusUrl: '3.95.22.37:8081',
+                groupId: 'com.zeeshan',
+                version: '1.0',
+                repository: 'maven-release',
+                credentialsId: 'nexus-creid',
+                artifacts: [
+                    [
+                        artifactId: 'tomcat-app01',
+                        classifier: '',
+                        file: 'target/tomcat-app01.war',
+                        type: 'war'
+                    ]
+                ]
+            )
+        }
+
+        stage('Deploy to Tomcat') {
+
+            deploy adapters: [
+                tomcat9(
+                    credentialsId: 'tomcat-jenkins',
+                    path: '',
+                    url: "${TOMCAT_URL}"
+                )
+            ],
+            contextPath: "${CONTEXT_PATH}",
+            war: 'target/tomcat-app01.war'
+        }
+
+        stage('Slack Notification') {
+
+            slackSend(
+                color: 'good',
+                message: """
+SUCCESS: Jenkins Pipeline
+
+Job: ${env.JOB_NAME}
+Build: #${env.BUILD_NUMBER}
+Status: SUCCESS
+
+Application:
+${TOMCAT_URL}${CONTEXT_PATH}/
+
+Build URL:
+${env.BUILD_URL}
+"""
+            )
+        }
+
+    } catch (Exception e) {
+
+        slackSend(
+            color: 'danger',
+            message: """
+FAILED: Jenkins Pipeline
+
+Job: ${env.JOB_NAME}
+Build: #${env.BUILD_NUMBER}
+Status: FAILED
+
+Build URL:
+${env.BUILD_URL}
+"""
+        )
+
+        throw e
+
+    } finally {
+
+        echo 'Pipeline execution completed.'
+    }
+}
