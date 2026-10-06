@@ -1,5 +1,9 @@
 node {
 
+    // Maven configured in Jenkins
+    def mvnHome = tool 'maven-integration'
+    env.PATH = "${mvnHome}/bin:${env.PATH}"
+
     def APP_NAME = 'tomcat-app01'
     def CONTEXT_PATH = '/declarativejob'
 
@@ -11,8 +15,10 @@ node {
     try {
 
         stage('Checkout') {
-            git branch: 'main',
+            git(
+                branch: 'main',
                 url: 'https://github.com/Zeeshancloud15/Tomcat_app01.git'
+            )
         }
 
         stage('Build') {
@@ -27,9 +33,7 @@ node {
         }
 
         stage('SonarQube Analysis') {
-
             withSonarQubeEnv('sonar-server') {
-
                 sh '''
                     /opt/sonar-scanner/bin/sonar-scanner
                 '''
@@ -37,15 +41,12 @@ node {
         }
 
         stage('Quality Gate') {
-
             timeout(time: 1, unit: 'MINUTES') {
-
                 waitForQualityGate abortPipeline: false
             }
         }
 
         stage('Upload to Nexus') {
-
             nexusArtifactUploader(
                 nexusVersion: 'nexus3',
                 protocol: 'http',
@@ -66,20 +67,20 @@ node {
         }
 
         stage('Deploy to Tomcat') {
-
-            deploy adapters: [
-                tomcat9(
-                    credentialsId: 'tomcat-jenkins',
-                    path: '',
-                    url: "${TOMCAT_URL}"
-                )
-            ],
-            contextPath: "${CONTEXT_PATH}",
-            war: 'target/tomcat-app01.war'
+            deploy(
+                adapters: [
+                    tomcat9(
+                        credentialsId: 'tomcat-jenkins',
+                        path: '',
+                        url: "${TOMCAT_URL}"
+                    )
+                ],
+                contextPath: "${CONTEXT_PATH}",
+                war: 'target/tomcat-app01.war'
+            )
         }
 
         stage('Slack Notification') {
-
             slackSend(
                 color: 'good',
                 message: """
