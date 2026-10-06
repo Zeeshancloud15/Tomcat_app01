@@ -13,7 +13,7 @@ pipeline {
         NEXUS_URL = 'http://3.95.22.37:8081'
         NEXUS_CREDENTIALS = 'nexus-creid'
 
-        TOMCAT_URL = 'http://3.235.2.67:8080'
+        TOMCAT_URL = 'http://35.169.107.79:8080'
     }
 
     stages {
@@ -33,7 +33,10 @@ pipeline {
 
         stage('Verify WAR') {
             steps {
-                sh 'ls -lh target/'
+                sh '''
+                    ls -lh target/
+                    test -f target/tomcat-app01.war
+                '''
             }
         }
 
@@ -83,10 +86,10 @@ pipeline {
                     tomcat9(
                         credentialsId: 'tomcat-jenkins',
                         path: '',
-                        url: 'http://35.169.107.79:8080'
+                        url: "${TOMCAT_URL}"
                     )
                 ],
-                contextPath: '/declarativejob',
+                contextPath: "${CONTEXT_PATH}",
                 war: 'target/tomcat-app01.war'
             }
         }
@@ -96,11 +99,43 @@ pipeline {
 
         success {
             echo 'Pipeline completed successfully.'
-            echo 'Application: http:/35.169.107.79:8080/declarativejob/'
+
+            echo "Application: ${TOMCAT_URL}${CONTEXT_PATH}/"
+
+            slackSend(
+                color: 'good',
+                message: """
+SUCCESS: Jenkins Pipeline
+
+Job: ${env.JOB_NAME}
+Build: #${env.BUILD_NUMBER}
+Status: SUCCESS
+
+Application:
+${TOMCAT_URL}${CONTEXT_PATH}/
+
+Build URL:
+${env.BUILD_URL}
+"""
+            )
         }
 
         failure {
             echo 'Pipeline failed.'
+
+            slackSend(
+                color: 'danger',
+                message: """
+FAILED: Jenkins Pipeline
+
+Job: ${env.JOB_NAME}
+Build: #${env.BUILD_NUMBER}
+Status: FAILED
+
+Build URL:
+${env.BUILD_URL}
+"""
+            )
         }
 
         always {
