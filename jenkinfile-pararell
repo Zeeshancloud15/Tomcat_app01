@@ -13,7 +13,7 @@ pipeline {
                 echo 'Checking out source code...'
 
                 git branch: 'main',
-                    url: 'https://github.com/Zeeshancloud15/multistage-pipeline.git'
+                    url: 'https://github.com/Zeeshancloud15/Tomcat_app01.git'
             }
         }
 
