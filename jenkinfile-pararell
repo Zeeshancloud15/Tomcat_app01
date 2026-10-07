@@ -1,0 +1,91 @@
+```groovy
+pipeline {
+
+    agent any
+
+    tools {
+        maven 'maven-integration'
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                echo 'Checking out source code...'
+
+                git branch: 'main',
+                    url: 'https://github.com/Zeeshancloud15/multistage-pipeline.git'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                echo 'Building application...'
+
+                sh 'mvn clean compile'
+            }
+        }
+
+        stage('Parallel Tests') {
+
+            parallel {
+
+                stage('Unit Test') {
+                    steps {
+                        echo 'Running Unit Tests...'
+
+                        sh 'mvn test'
+                    }
+                }
+
+                stage('Code Quality') {
+                    steps {
+                        echo 'Running Code Quality Check...'
+
+                        sh 'mvn verify -DskipTests'
+                    }
+                }
+            }
+        }
+
+        stage('Package') {
+            steps {
+                echo 'Creating application package...'
+
+                sh 'mvn package -DskipTests'
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                echo 'Deploying application...'
+
+                sh 'echo Application deployed successfully'
+            }
+        }
+
+        stage('Verify') {
+            steps {
+                echo 'Verifying application...'
+
+                sh 'echo Application verification successful'
+            }
+        }
+    }
+
+    post {
+
+        success {
+            echo 'Parallel pipeline completed successfully!'
+        }
+
+        failure {
+            echo 'Pipeline failed. Check the failed stage.'
+        }
+
+        always {
+            echo 'Pipeline execution completed.'
+        }
+    }
+}
+```
